@@ -149,25 +149,90 @@ function runChecks(w, dom) {
       if (!h3s.includes("Manually added items")) throw new Error(h3s.join(","));
     });
 
-    // create a build in gh, equip an item
-    t("create gh build and equip via picker", () => {
+    // create a build in gh, equip by dragging an available item onto a slot
+    t("create gh build and equip via drag to slot", () => {
       w.document.getElementById("new-build-button").click();
       if (w.__get("builds.length") !== 1) throw new Error("no build");
-      w.__get(""); dom.window.eval("builds[0].campaignId = campaigns[0].id; savePlayerData(); render();");
-      const selects = Array.from(w.document.querySelectorAll(".slot-picker"));
-      const legs = selects.find(s => s.options[0].textContent === "Legs");
-      if (!legs) throw new Error("no legs picker");
-      if (legs.options.length < 2) throw new Error("legs picker has no items");
-      legs.value = legs.options[1].value;
-      legs.dispatchEvent(new w.Event("change", { bubbles: true }));
+      dom.window.eval("builds[0].campaignId = campaigns[0].id; savePlayerData(); render();");
+      if (w.__get("findItem(1).slot") !== "legs") throw new Error("gh item 1 is not legs");
+      const legsBox = Array.from(w.document.querySelectorAll(".slot-picture"))
+        .find(b => b.dataset.slot === "legs");
+      if (!legsBox) throw new Error("no legs slot box");
+      const dropEvent = new w.Event("drop", { bubbles: true });
+      dropEvent.dataTransfer = { getData: () => "1" };
+      legsBox.dispatchEvent(dropEvent);
       if (w.__get("builds[0].equippedItemNumbers.length") !== 1) throw new Error("not equipped");
+      if (!w.__get("builds[0].equippedItemNumbers.includes(1)")) throw new Error("wrong item equipped");
     });
 
-    // issue 28: no potions dropdown in build mode
-    t("build mode has no potions dropdown", () => {
-      const labels = Array.from(w.document.querySelectorAll(".slot-picker")).map(s => s.options[0].textContent);
-      if (labels.some(l => l.indexOf("Potion") !== -1)) throw new Error(labels.join(","));
-      if (!labels.some(l => l.indexOf("Items") === 0)) throw new Error(labels.join(","));
+    // issue 42: no per-slot dropdown lists anymore
+    t("build page has no dropdown item pickers", () => {
+      if (w.document.querySelector(".slot-picker")) throw new Error("slot picker still present");
+      const h3s = Array.from(w.document.querySelectorAll("h3")).map(h => h.textContent);
+      if (h3s.includes("Add items")) throw new Error("add items section still present");
+    });
+
+    // issue 41: wishlist as draggable item cards
+    t("wishlist renders as draggable item cards", () => {
+      dom.window.eval("builds[0].wishlistItemNumbers = [20, 3]; savePlayerData(); render();");
+      const grid = w.document.querySelector(".wishlist-grid");
+      if (!grid) throw new Error("no wishlist grid");
+      const cards = grid.querySelectorAll(".wishlist-card");
+      if (cards.length !== 2) throw new Error("cards=" + cards.length);
+      if (!cards[0].draggable) throw new Error("wishlist card not draggable");
+      if (!cards[0].querySelector(".card-actions")) throw new Error("no card actions");
+    });
+
+    // issue 43: wishlist sort by equipment slot like the All Items page
+    t("wishlist sorts by slot by default", () => {
+      const select = w.document.querySelector(".wishlist-sort");
+      if (!select) throw new Error("no wishlist sort select");
+      if (w.__get("wishlistSortCriterion") !== "slot") throw new Error("default=" + w.__get("wishlistSortCriterion"));
+      const first = w.document.querySelector(".wishlist-card img");
+      if (first.getAttribute("alt").indexOf("#3") !== 0) throw new Error("first card=" + first.getAttribute("alt"));
+      select.value = "name";
+      select.dispatchEvent(new w.Event("change", { bubbles: true }));
+      if (w.__get("wishlistSortCriterion") !== "name") throw new Error("sort not applied");
+      select.value = "slot";
+      select.dispatchEvent(new w.Event("change", { bubbles: true }));
+    });
+
+    t("wishlist card equip button equips", () => {
+      const card = w.document.querySelector(".wishlist-card");
+      const equipButton = Array.from(card.querySelectorAll("button"))
+        .find(b => b.textContent === "Equip");
+      if (!equipButton) throw new Error("no equip button");
+      equipButton.click();
+      if (!w.__get("builds[0].equippedItemNumbers.includes(3)")) throw new Error("not equipped");
+    });
+
+    t("wishlist card remove button removes", () => {
+      const card = w.document.querySelector(".wishlist-card");
+      const removeButton = Array.from(card.querySelectorAll("button"))
+        .find(b => b.textContent === "Remove");
+      if (!removeButton) throw new Error("no remove button");
+      removeButton.click();
+      if (w.__get("builds[0].wishlistItemNumbers.length") !== 1) throw new Error("not removed");
+    });
+
+    // issue 44: equip straight from the item card detail overlay
+    t("equip from item card overlay", () => {
+      w.openDetailOverlay(6);
+      const buildSelect = w.document.getElementById("add-to-build-select");
+      buildSelect.value = w.__get("builds[0].id");
+      w.document.getElementById("equip-to-build-button").click();
+      if (!w.__get("builds[0].equippedItemNumbers.includes(6)")) throw new Error("not equipped");
+    });
+
+    // issue 45: campaign share files
+    t("campaign page offers download and upload of a campaign file", () => {
+      dom.window.eval("currentPage = 'campaign:' + campaigns[0].id; render();");
+      const buttons = Array.from(w.document.querySelectorAll(".campaign-share button"))
+        .map(b => b.textContent);
+      if (!buttons.includes("Download campaign file")) throw new Error(buttons.join(","));
+      if (!w.document.querySelector(".campaign-share input[type=file]")) throw new Error("no upload input");
+      if (w.__get("campaignFileName(campaigns[0])").indexOf(".frosthaven-campaign.json") === -1) throw new Error("bad file name");
+      dom.window.eval("currentPage = 'build:' + builds[0].id; render();");
     });
 
     // issue 22: slot picture draggable
@@ -300,6 +365,30 @@ function runChecks(w, dom) {
       if (!wrap.classList.contains("confirming")) throw new Error("not confirming after click");
       cancelBtn.click();
       if (wrap.classList.contains("confirming")) throw new Error("still confirming after cancel");
+    });
+
+    // issue 37: the New build button follows the Gloomhaven colour coding
+    t("gloomhaven theme recolors the new build button", () => {
+      const css = require("fs").readFileSync(require("path").join(__dirname, "..", "..", "styles.css"), "utf8");
+      if (css.indexOf("body.theme-gloomhaven .new-build-button") === -1) throw new Error("no gloomhaven override");
+    });
+
+    // issue 40: click the character card to see it bigger and flip it
+    t("character artwork enlarges and flips in the overlay", () => {
+      dom.window.eval("currentPage = 'build:' + builds[builds.length - 1].id; render();");
+      const frame = w.document.querySelector(".character-stage .artwork-frame.clickable");
+      if (!frame) throw new Error("artwork frame not clickable");
+      frame.click();
+      const image = w.document.getElementById("character-overlay-image");
+      if (!image) throw new Error("no character overlay image");
+      if (image.getAttribute("src").indexOf("fh-") === -1) throw new Error("not fh art: " + image.getAttribute("src"));
+      const flip = w.document.getElementById("flip-character-button");
+      if (!flip) throw new Error("no flip button");
+      flip.click();
+      if (image.getAttribute("src").indexOf("-back.webp") === -1) throw new Error("no back side: " + image.getAttribute("src"));
+      flip.click();
+      if (image.getAttribute("src").indexOf("-back.webp") !== -1) throw new Error("did not flip back");
+      w.document.querySelector("#detail-content .close-overlay").click();
     });
 
     console.log("done");

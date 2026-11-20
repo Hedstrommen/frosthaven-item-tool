@@ -581,6 +581,94 @@ li.spoiler-hidden {
 .available-picture:hover { border-color: var(--accent); }
 
 .wishlist-list.drop-hover { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 8px; }
+.wishlist-controls { display: flex; align-items: center; gap: 8px; }
+.wishlist-controls .wishlist-sort {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: inherit;
+}
+
+/* Wishlist as item cards (issue #41): same grid of card pictures as the
+   All Items page, each one draggable into an equipment slot box. */
+.wishlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.wishlist-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.wishlist-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.wishlist-card img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--surface-bright);
+  pointer-events: none;
+}
+.wishlist-card .item-fallback { min-height: 120px; }
+.wishlist-card .card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.wishlist-card .card-actions button {
+  flex: 1;
+  background: var(--surface-bright);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 4px;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.wishlist-card .card-actions button:hover { border-color: var(--accent); color: var(--parchment); }
+
+/* Share a campaign as a file (issue #45) */
+.campaign-share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.campaign-share button {
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+}
+.campaign-share button:hover { border-color: var(--accent); }
+.upload-campaign-label {
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.upload-campaign-label:hover { border-color: var(--accent); }
+.upload-campaign-label input { display: none; }
+
+/* Character mat enlarges/flips in the overlay (issue #40) */
+.artwork-frame.clickable { cursor: pointer; }
+.artwork-frame.clickable:hover { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+
 
 .build-form { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 280px; }
 .build-form input, .build-form select, .build-form textarea {
@@ -716,6 +804,19 @@ li.spoiler-hidden {
   .controls { gap: 6px; }
   .controls input { min-width: 120px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Issue #37: the New build button (and the other frost-blue gradient buttons)
+   follow the game theme instead of always using Frosthaven's palette.
+   --------------------------------------------------------------------------- */
+body.theme-gloomhaven .new-build-button,
+body.theme-gloomhaven .primary-button {
+  color: #1a110a;
+  background: linear-gradient(180deg, #e8c27a, #b5651d);
+  border-color: #d8a24a;
+  box-shadow: 0 4px 14px rgba(184, 101, 29, 0.4);
+}
+body.theme-gloomhaven .new-build-button:hover { box-shadow: 0 6px 20px rgba(184, 101, 29, 0.55); }
 
 /* ---------------------------------------------------------------------------
    Issue #35: Gloomhaven palette. When the Gloomhaven toggle is active the

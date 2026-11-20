@@ -963,6 +963,35 @@ function renderSingleCampaignPage(campaignId) {
   intro.textContent = "Check the buildings you have unlocked to add their items, or add items from the other groups below.";
   appElement.appendChild(intro);
 
+  // Share this campaign as a file: download it for a friend, or upload a
+  // campaign file to add it to your own list (issue #45).
+  const shareWrap = document.createElement("div");
+  shareWrap.className = "campaign-share";
+  const downloadButton = document.createElement("button");
+  downloadButton.type = "button";
+  downloadButton.textContent = "Download campaign file";
+  downloadButton.addEventListener("click", function () {
+    downloadCampaignFile(campaign);
+  });
+  shareWrap.appendChild(downloadButton);
+  const uploadLabel = document.createElement("label");
+  uploadLabel.className = "upload-campaign-label";
+  uploadLabel.textContent = "Upload campaign file";
+  const uploadInput = document.createElement("input");
+  uploadInput.type = "file";
+  uploadInput.accept = "application/json,.json";
+  uploadInput.addEventListener("change", function () {
+    if (uploadInput.files !== null && uploadInput.files.length > 0) {
+      importCampaignFile(uploadInput.files[0], uploadStatusLine);
+    }
+  });
+  uploadLabel.appendChild(uploadInput);
+  shareWrap.appendChild(uploadLabel);
+  const uploadStatusLine = document.createElement("span");
+  uploadStatusLine.className = "status-text";
+  shareWrap.appendChild(uploadStatusLine);
+  appElement.appendChild(shareWrap);
+
   // Static view toggle: unlock management (default) or available items view.
   const viewToggle = document.createElement("div");
   viewToggle.className = "view-toggle";
@@ -1263,10 +1292,15 @@ function renderSingleBuildPage(buildId) {
     stage.classList.add("character-themed");
   }
   if (hasArt) {
-    stage.innerHTML =
-      '<div class="artwork-frame">' +
-        '<img class="background" src="assets/characters/' + character.slug + '.webp" alt="' + escapeHtml(character.name) + '" />' +
-      "</div>";
+    const frame = document.createElement("div");
+    frame.className = "artwork-frame clickable";
+    frame.title = character.name + " - click to enlarge";
+    frame.innerHTML =
+      '<img class="background" src="assets/characters/' + character.slug + '.webp" alt="' + escapeHtml(character.name) + '" />';
+    frame.addEventListener("click", function () {
+      openCharacterOverlay(build.characterIndex);
+    });
+    stage.appendChild(frame);
   } else {
     const namePlate = document.createElement("div");
     namePlate.className = "stage-placeholder";
@@ -1417,90 +1451,28 @@ function renderSingleBuildPage(buildId) {
   }
   form.appendChild(equippedList);
 
-  const pickerTitle = document.createElement("h3");
-  pickerTitle.textContent = "Add items";
-  form.appendChild(pickerTitle);
-
-  // Per-slot dropdowns: each only lists campaign-unlocked items for that slot.
-  const pool = buildPool(build);
-  const slotGroups = [
-    { label: "Hand 1", slot: "one hand", includeTwoHanded: true },
-    { label: "Hand 2", slot: "one hand", includeTwoHanded: true },
-    { label: "Head", slot: "head" },
-    { label: "Body", slot: "body" },
-    { label: "Legs", slot: "legs" },
-    { label: "Items", slot: "small" }
-  ];
-  let anyOptions = false;
-  const pickerWrap = document.createElement("div");
-  pickerWrap.className = "slot-picker-wrap";
-  for (const group of slotGroups) {
-    const select = document.createElement("select");
-    select.className = "slot-picker";
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = group.label;
-    select.appendChild(placeholder);
-    const candidates = catalog.filter(function (item) {
-      if (!pool.has(item.number) || build.equippedItemNumbers.includes(item.number)) {
-        return false;
-      }
-      if (group.potionsOnly === true) {
-        return isPotionItem(item);
-      }
-      if (group.includeTwoHanded === true && item.slot === "two hands") {
-        return true;
-      }
-      return item.slot === group.slot;
-    });
-    candidates.sort(function (first, second) { return first.number - second.number; });
-    for (const item of candidates) {
-      const option = document.createElement("option");
-      option.value = item.number;
-      option.textContent = "#" + item.number + " " + item.name;
-      select.appendChild(option);
-      anyOptions = true;
-    }
-    if (candidates.length === 0) {
-      placeholder.textContent = group.label + " (none unlocked)";
-    }
-    select.addEventListener("change", function () {
-      if (select.value === "") {
-        return;
-      }
-      const item = findItem(Number(select.value));
-      if (item === null) {
-        return;
-      }
-      const result = tryEquipItem(build, item);
-      if (result.isSuccess) {
-        savePlayerData();
-        render();
-      } else {
-        statusLine.textContent = result.reason;
-        statusLine.classList.add("error-text");
-        select.value = "";
-      }
-    });
-    pickerWrap.appendChild(select);
-  }
-  form.appendChild(pickerWrap);
-  if (!anyOptions) {
-    const hint = document.createElement("p");
-    hint.className = "empty-hint";
-    const campaign = buildCampaign(build);
-    hint.textContent = campaign === null
-      ? "Select a campaign above (or in My Campaigns) to unlock items for this build."
-      : "Unlock more items in " + campaign.name + " first.";
-    form.appendChild(hint);
-  }
-
   // Wishlist: items the player wants for this build, tracked separately from
   // the equipped loadout. Any number of items can be added, including by
-  // dragging pictures from the Available items section.
+  // dragging pictures from the Available items section (issues #41-#43).
   const wishlistTitle = document.createElement("h3");
   wishlistTitle.textContent = "Wishlist";
   form.appendChild(wishlistTitle);
+
+  const wishlistControls = document.createElement("div");
+  wishlistControls.className = "wishlist-controls";
+  const wishlistSortSelect = document.createElement("select");
+  wishlistSortSelect.className = "wishlist-sort";
+  [["number", "Sort: number"], ["slot", "Sort: slot"], ["name", "Sort: name"]].forEach(function (entry) {
+    const option = document.createElement("option");
+    option.value = entry[0];
+    option.textContent = entry[1];
+    if (entry[0] === wishlistSortCriterion) {
+      option.selected = true;
+    }
+    wishlistSortSelect.appendChild(option);
+  });
+  wishlistControls.appendChild(wishlistSortSelect);
+  form.appendChild(wishlistControls);
 
   const wishlistList = document.createElement("div");
   wishlistList.className = "wishlist-list";
@@ -1527,34 +1499,25 @@ function renderSingleBuildPage(buildId) {
       render();
     }
   });
-  for (const wishedNumber of build.wishlistItemNumbers) {
-    const item = findItem(wishedNumber);
-    if (item === null) {
-      continue;
-    }
-    const wishedRow = document.createElement("div");
-    wishedRow.className = "build-row wishlist-row";
-    wishedRow.innerHTML = "<div>#" + item.number + " " + escapeHtml(item.name) +
-      '<div class="item-slot">' + escapeHtml(item.slot) + "</div></div>";
-    const removeWished = document.createElement("button");
-    removeWished.textContent = "Remove";
-    removeWished.addEventListener("click", function () {
-      build.wishlistItemNumbers = build.wishlistItemNumbers.filter(function (number) {
-        return number !== wishedNumber;
-      });
-      savePlayerData();
-      render();
-    });
-    wishedRow.appendChild(removeWished);
-    wishlistList.appendChild(wishedRow);
+  const wishlistGrid = document.createElement("div");
+  wishlistGrid.className = "wishlist-list wishlist-grid";
+  wishlistList.appendChild(wishlistGrid);
+  for (const wishedNumber of sortedWishlistItems(build)) {
+    wishlistGrid.appendChild(createWishlistCard(build, wishedNumber));
   }
   if (build.wishlistItemNumbers.length === 0) {
     const hint = document.createElement("p");
     hint.className = "empty-hint";
     hint.textContent = "Nothing on the wishlist yet. Use the search below to add items you want.";
-    wishlistList.appendChild(hint);
+    wishlistGrid.appendChild(hint);
   }
   form.appendChild(wishlistList);
+  wishlistSortSelect.addEventListener("change", function () {
+    wishlistSortCriterion = wishlistSortSelect.value === "name" || wishlistSortSelect.value === "slot" || wishlistSortSelect.value === "number"
+      ? wishlistSortSelect.value
+      : "slot";
+    render();
+  });
 
   // Wishlist search: add any item from the whole catalog.
   const wishlistSearchInput = document.createElement("input");
@@ -1692,6 +1655,86 @@ function renderAvailableItems(build, filterText, container) {
     hint.textContent = needle !== "" ? "No matching unlocked items." : "No items unlocked in this campaign yet.";
     container.appendChild(hint);
   }
+}
+
+// Wishlist sorting (issue #43): the same sort criteria as the All Items page,
+// grouped by equipment slot by default.
+let wishlistSortCriterion = "slot";
+
+function sortedWishlistItems(build) {
+  const items = build.wishlistItemNumbers
+    .map(findItem)
+    .filter(function (item) { return item !== null; });
+  items.sort(function (first, second) {
+    if (wishlistSortCriterion === "name") {
+      return first.name.localeCompare(second.name);
+    }
+    if (wishlistSortCriterion === "slot") {
+      const slotComparison = SLOTS.indexOf(first.slot) - SLOTS.indexOf(second.slot);
+      if (slotComparison !== 0) {
+        return slotComparison;
+      }
+      return first.number - second.number;
+    }
+    return first.number - second.number;
+  });
+  return items;
+}
+
+// One wishlist entry as an item card (issue #41): the card picture with
+// buttons to equip or remove it, and draggable so it can be dropped onto an
+// equipment slot box like the Available item pictures.
+function createWishlistCard(build, item) {
+  const card = document.createElement("div");
+  card.className = "wishlist-card";
+  card.title = "#" + item.number + " " + item.name + " (" + item.slot + ") - drag to a slot to equip";
+  card.draggable = true;
+  card.addEventListener("dragstart", function (event) {
+    event.dataTransfer.setData("text/plain", String(item.number));
+    event.dataTransfer.effectAllowed = "copy";
+  });
+  card.addEventListener("click", function () {
+    openDetailOverlay(item.number);
+  });
+  if (item.image !== "") {
+    const image = document.createElement("img");
+    image.src = itemImageBase(item) + item.image;
+    image.alt = "#" + item.number + " " + item.name;
+    image.draggable = false;
+    attachImageFallback(image, item);
+    card.appendChild(image);
+  } else {
+    const fallback = document.createElement("div");
+    fallback.className = "item-fallback";
+    fallback.innerHTML =
+      '<span class="item-number">#' + item.number + "</span>" +
+      '<span class="item-name">' + escapeHtml(item.name) + "</span>";
+    card.appendChild(fallback);
+  }
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  const equipButton = document.createElement("button");
+  equipButton.type = "button";
+  equipButton.textContent = "Equip";
+  equipButton.addEventListener("click", function (event) {
+    event.stopPropagation();
+    equipIntoBuild(build, item);
+  });
+  actions.appendChild(equipButton);
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.textContent = "Remove";
+  removeButton.addEventListener("click", function (event) {
+    event.stopPropagation();
+    build.wishlistItemNumbers = build.wishlistItemNumbers.filter(function (number) {
+      return number !== item.number;
+    });
+    savePlayerData();
+    render();
+  });
+  actions.appendChild(removeButton);
+  card.appendChild(actions);
+  return card;
 }
 
 // Search results for the wishlist picker: any catalog item can be added.
@@ -1952,7 +1995,7 @@ function openDetailOverlay(itemNumber) {
             }).join("") +
             "</ul>"
           : "") +
-        "<div class=\"add-to-build\"><strong>Add to build wishlist</strong> <select id=\"add-to-build-select\"></select> <button id=\"add-to-build-button\" class=\"primary-button\">Add</button></div>" +
+        "<div class=\"add-to-build\"><strong>Add to build</strong> <select id=\"add-to-build-select\"></select> <button id=\"add-to-build-button\" class=\"primary-button\">Add to wishlist</button> <button id=\"equip-to-build-button\" class=\"primary-button\">Equip</button><span id=\"add-to-build-status\"></span></div>" +
         "<button class=close-overlay>Close</button>" +
       "</div>" +
     "</div>";
@@ -1992,7 +2035,9 @@ function openDetailOverlay(itemNumber) {
     });
   }
 
-  // Add to build wishlist: choose one of the player's builds.
+  // Add to build wishlist / equip straight from the item card (issue #44):
+  // every place an item card is shown can equip it into one of the player's
+  // builds without leaving the page.
   const buildSelect = content.querySelector("#add-to-build-select");
   if (buildSelect !== null) {
     const gameBuilds = builds.filter(function (candidate) { return buildGame(candidate) === activeGame; });
@@ -2006,9 +2051,11 @@ function openDetailOverlay(itemNumber) {
       option.textContent = candidate.title;
       buildSelect.appendChild(option);
     });
+    const statusText = content.querySelector("#add-to-build-status");
     content.querySelector("#add-to-build-button").addEventListener("click", function () {
       const targetBuild = builds.find(function (candidate) { return candidate.id === buildSelect.value; });
       if (targetBuild === undefined) {
+        statusText.textContent = "Choose a build first.";
         return;
       }
       if (!targetBuild.wishlistItemNumbers.includes(item.number)) {
@@ -2017,10 +2064,64 @@ function openDetailOverlay(itemNumber) {
       }
       closeDetailOverlay();
     });
+    content.querySelector("#equip-to-build-button").addEventListener("click", function () {
+      const targetBuild = builds.find(function (candidate) { return candidate.id === buildSelect.value; });
+      if (targetBuild === undefined) {
+        statusText.textContent = "Choose a build first.";
+        return;
+      }
+      const result = tryEquipItem(targetBuild, item);
+      if (result.isSuccess) {
+        savePlayerData();
+        closeDetailOverlay();
+      } else {
+        statusText.textContent = result.reason;
+      }
+    });
   }
   content.querySelector(".close-overlay").addEventListener("click", closeDetailOverlay);
 
   overlay.classList.remove("hidden");
+}
+
+// Character mat overlay (issue #40): clicking the character artwork on the
+// build page opens the big mat in an overlay, like the item cards. Frosthaven
+// character mats have a real back side to flip to; the other games' art has
+// no back, so no flip button is offered there.
+function openCharacterOverlay(characterIndex) {
+  const character = CHARACTERS[characterIndex] || CHARACTERS[0];
+  const hasBack = character.slug !== undefined && character.slug.indexOf("fh-") === 0;
+  const content = document.getElementById("detail-content");
+  content.innerHTML =
+    '<div class="detail-layout">' +
+      '<div class="detail-card">' +
+        '<img class="detail-image" id="character-overlay-image" src="assets/characters/' + character.slug + '.webp" alt="' + escapeHtml(character.name) + '" />' +
+        (hasBack
+          ? '<button type="button" id="flip-character-button" class="flip-button">Flip card</button>'
+          : "") +
+      "</div>" +
+      '<div class="detail-info">' +
+        "<h2>" + escapeHtml(character.name) + "</h2>" +
+        "<p><strong>Game:</strong> " + escapeHtml(character.group) + "</p>" +
+        (hasBack
+          ? "<p class=empty-hint>Press the button to see the back of the character mat.</p>"
+          : "<p class=empty-hint>This character has no card back.</p>") +
+        '<button class="close-overlay">Close</button>' +
+      "</div>" +
+    "</div>";
+  const flipButton = content.querySelector("#flip-character-button");
+  if (flipButton !== null) {
+    let showingBack = false;
+    const image = content.querySelector("#character-overlay-image");
+    flipButton.addEventListener("click", function () {
+      showingBack = !showingBack;
+      image.src = "assets/characters/" + character.slug + (showingBack ? "-back" : "") + ".webp";
+      image.alt = escapeHtml(character.name) + (showingBack ? " (card back)" : "");
+      flipButton.textContent = showingBack ? "Show front" : "Flip card";
+    });
+  }
+  content.querySelector(".close-overlay").addEventListener("click", closeDetailOverlay);
+  document.getElementById("detail-overlay").classList.remove("hidden");
 }
 
 function buildRecipeHtml(item) {
@@ -2084,6 +2185,67 @@ function importPlayerData(file) {
       render();
     } catch (error) {
       document.getElementById("import-status").textContent = "That file could not be read as a backup.";
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ---------------------------------------------------------------------------
+// Campaign share files (issue #45): download one campaign as its own file so
+// it can be shared with friends, and upload such a file to add the campaign
+// to your own list. Campaign files are single-player-data backups with one
+// campaign inside.
+// ---------------------------------------------------------------------------
+
+function campaignFileName(campaign) {
+  const slug = campaign.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return (slug === "" ? "campaign" : slug) + ".frosthaven-campaign.json";
+}
+
+function downloadCampaignFile(campaign) {
+  const data = {
+    app: "frosthaven-item-tool",
+    kind: "campaign",
+    game: campaign.game || "frosthaven",
+    campaign: campaign
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = campaignFileName(campaign);
+  link.click();
+  URL.revokeObjectURL(downloadUrl);
+}
+
+function importCampaignFile(file, statusElement) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    try {
+      const data = JSON.parse(reader.result);
+      const campaignData = data.kind === "campaign" || data.campaign !== undefined
+        ? data.campaign
+        : data.unlockedBuildings !== undefined && data.game !== undefined
+          ? data
+          : null;
+      if (campaignData === null) {
+        throw new Error("not a campaign file");
+      }
+      const campaign = normalizeCampaign(campaignData);
+      // The uploaded campaign gets a fresh id so it never collides with (or
+      // silently overwrites) one of the player's own campaigns.
+      campaign.id = crypto.randomUUID();
+      campaigns.push(campaign);
+      activeCampaignId = campaign.id;
+      savePlayerData();
+      statusElement.textContent = "Campaign \"" + campaign.name + "\" imported.";
+      currentPage = "campaign:" + campaign.id;
+      render();
+    } catch (error) {
+      statusElement.textContent = "That file could not be read as a campaign file.";
     }
   };
   reader.readAsText(file);
