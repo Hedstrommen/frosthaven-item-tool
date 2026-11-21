@@ -1,7 +1,7 @@
 // Minimal service worker so browsers treat the site as installable.
 // App shell files are cached for offline use; item card images are always
 // fetched from the network so a broken cache can never hide the pictures.
-const CACHE_NAME = "frosthaven-item-tool-v4";
+const CACHE_NAME = "frosthaven-item-tool-v5";
 const CORE_FILES = [
   "./",
   "./index.html",

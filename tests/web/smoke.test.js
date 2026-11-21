@@ -224,6 +224,63 @@ function runChecks(w, dom) {
       if (!w.__get("builds[0].equippedItemNumbers.includes(6)")) throw new Error("not equipped");
     });
 
+    // issue 47: filter the wishlist by slot type
+    t("wishlist filter by slot hides other slots", () => {
+      dom.window.eval("builds[0].wishlistItemNumbers = [20, 3]; savePlayerData(); render();");
+      const filterSelect = w.document.querySelector(".wishlist-filter");
+      if (!filterSelect) throw new Error("no wishlist filter select");
+      if (filterSelect.value !== "") throw new Error("default=" + filterSelect.value);
+      if (w.document.querySelectorAll(".wishlist-card").length !== 2) throw new Error("all slots should show 2");
+      dom.window.eval("builds[0].wishlistItemNumbers = [3]; savePlayerData(); render();");
+      filterSelect.value = "small";
+      filterSelect.dispatchEvent(new w.Event("change", { bubbles: true }));
+      if (w.__get("wishlistSlotFilter") !== "small") throw new Error("filter not applied");
+      if (w.document.querySelectorAll(".wishlist-card").length !== 0) throw new Error("small filter should hide the body card");
+      filterSelect.value = "";
+      filterSelect.dispatchEvent(new w.Event("change", { bubbles: true }));
+      if (w.document.querySelectorAll(".wishlist-card").length !== 1) throw new Error("clearing filter should show 1");
+    });
+
+    // issue 50: compact equipped strip under the graphical slots
+    t("compact equipped strip under the slots", () => {
+      const strip = w.document.querySelector(".equipped-strip");
+      if (!strip) throw new Error("no equipped strip");
+      const h3s = Array.from(w.document.querySelectorAll("h3")).map(h => h.textContent);
+      if (!h3s.some(t => t.indexOf("Equipped (") === 0)) throw new Error(h3s.join(","));
+      if (h3s.includes("Equipped items")) throw new Error("big duplicate list still present");
+      const chipRemove = strip.querySelector(".equipped-chip-remove");
+      if (!chipRemove) throw new Error("no chip remove button");
+      const before = w.__get("builds[0].equippedItemNumbers.length");
+      chipRemove.click();
+      if (w.__get("builds[0].equippedItemNumbers.length") !== before - 1) throw new Error("chip remove did not unequip");
+      // re-equip for the later tests
+      dom.window.eval("equipIntoBuild(builds[0], findItem(1));");
+    });
+
+    // issues 49 + 51: touch drag with pointer events
+    t("touch drag from available items onto a slot equips", () => {
+      const smallBox = Array.from(w.document.querySelectorAll(".slot-picture"))
+        .find(b => b.dataset.slot === "small");
+      dom.window.eval("touchDrag = { kind: 'available', number: 12, buildId: builds[0].id, source: document.querySelector('.available-picture'), startX: 0, startY: 0, downAt: Date.now() - 500, started: true, ghost: null, prevHover: null };");
+      w.document.elementFromPoint = () => smallBox;
+      const pointerUp = new w.Event("pointerup");
+      pointerUp.clientX = 10; pointerUp.clientY = 10;
+      w.finishTouchDrag(pointerUp, false);
+      if (!w.__get("builds[0].equippedItemNumbers.includes(12)")) throw new Error("touch drop did not equip");
+      dom.window.eval("unequipFromBuild(builds[0], 12);");
+    });
+
+    t("touch drag of an equipped item anywhere else unequips it", () => {
+      dom.window.eval("touchDrag = { kind: 'equipped', number: 1, buildId: builds[0].id, source: document.querySelector('.slot-picture.filled'), startX: 0, startY: 0, downAt: Date.now() - 500, started: true, ghost: null, prevHover: null };");
+      w.document.elementFromPoint = () => w.document.getElementById("app");
+      const pointerUp = new w.Event("pointerup");
+      pointerUp.clientX = 10; pointerUp.clientY = 10;
+      const before = w.__get("builds[0].equippedItemNumbers.length");
+      w.finishTouchDrag(pointerUp, false);
+      if (w.__get("builds[0].equippedItemNumbers.length") !== before - 1) throw new Error("touch drop did not unequip");
+      if (w.__get("touchDrag") !== null) throw new Error("touch drag state not cleared");
+    });
+
     // issue 45: campaign share files
     t("campaign page offers download and upload of a campaign file", () => {
       dom.window.eval("currentPage = 'campaign:' + campaigns[0].id; render();");
@@ -251,7 +308,7 @@ function runChecks(w, dom) {
     // issue 26: explicit unequip button on filled slot boxes
     t("filled slot has an unequip button that works", () => {
       // re-equip first: the drop test above already unequipped the item
-      dom.window.eval("equipIntoBuild(builds[0], findItem(1));");
+      dom.window.eval("touchDragSwallowClick = false; equipIntoBuild(builds[0], findItem(1));");
       const filled = w.document.querySelector(".slot-picture.filled");
       const btn = filled.querySelector(".slot-unequip");
       if (!btn) throw new Error("no unequip button");
@@ -382,6 +439,12 @@ function runChecks(w, dom) {
       const image = w.document.getElementById("character-overlay-image");
       if (!image) throw new Error("no character overlay image");
       if (image.getAttribute("src").indexOf("fh-") === -1) throw new Error("not fh art: " + image.getAttribute("src"));
+      // issue 48: high resolution mat with a zoom toggle
+      if (!image.classList.contains("character-mat")) throw new Error("mat does not use the large style");
+      image.click();
+      if (!image.classList.contains("zoomed")) throw new Error("click did not zoom in");
+      image.click();
+      if (image.classList.contains("zoomed")) throw new Error("click did not zoom back out");
       const flip = w.document.getElementById("flip-character-button");
       if (!flip) throw new Error("no flip button");
       flip.click();
