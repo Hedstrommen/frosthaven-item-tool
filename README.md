@@ -9,6 +9,9 @@ A companion tool for the board game **Frosthaven** that lets you:
 5. Open any item to see its full card, crafting requirements, the complete crafting chain and which items it is used to build
 6. View a build with the character artwork and the equipment slots over the matching body parts (head, body, legs, hands) — drag an item away from its slot to unequip it
 7. Switch the whole tool between **Frosthaven** and **Gloomhaven** items with the toggle at the top of the sidebar (campaigns and builds are tracked per game)
+8. Keep a **wishlist** per build, shown as item cards — sort it by equipment slot, drag a card straight into a slot, or equip an item from its card wherever you see it
+9. Download a campaign as its own file and upload a friend's campaign file to import it into your list
+10. Click the character artwork on a build to view it large, and flip the Frosthaven character mats to their back side
 
 Card text uses inline SVG icons (attack, move, range, heal, shield, conditions, elements) matching the game's iconography.
 
