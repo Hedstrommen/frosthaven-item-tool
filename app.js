@@ -1335,6 +1335,53 @@ function renderSingleBuildPage(buildId) {
     slotPanel.appendChild(slotBox);
   }
   stage.appendChild(slotPanel);
+
+  // Compact summary of the equipped items right under the graphical slots
+  // (issue #50): one small line per equipped item instead of the big list in
+  // the form, so the view stays uncluttered.
+  const equippedStrip = document.createElement("div");
+  equippedStrip.className = "equipped-strip";
+  const equippedHeading = document.createElement("h3");
+  equippedHeading.className = "equipped-strip-heading";
+  equippedHeading.textContent = "Equipped (" + build.equippedItemNumbers.length + ")";
+  equippedStrip.appendChild(equippedHeading);
+  const equippedChips = document.createElement("div");
+  equippedChips.className = "equipped-chips";
+  for (const equippedNumber of build.equippedItemNumbers) {
+    const item = findItem(equippedNumber);
+    if (item === null) {
+      continue;
+    }
+    const chip = document.createElement("span");
+    chip.className = "equipped-chip";
+    chip.title = item.slot + " - click for details";
+    const nameButton = document.createElement("button");
+    nameButton.type = "button";
+    nameButton.className = "equipped-chip-name";
+    nameButton.textContent = "#" + item.number + " " + item.name;
+    nameButton.addEventListener("click", function () {
+      openDetailOverlay(item.number);
+    });
+    chip.appendChild(nameButton);
+    const removeChip = document.createElement("button");
+    removeChip.type = "button";
+    removeChip.className = "equipped-chip-remove";
+    removeChip.title = "Unequip " + item.name;
+    removeChip.textContent = "\u2715";
+    removeChip.addEventListener("click", function () {
+      unequipFromBuild(build, item.number);
+    });
+    chip.appendChild(removeChip);
+    equippedChips.appendChild(chip);
+  }
+  if (build.equippedItemNumbers.length === 0) {
+    const hint = document.createElement("span");
+    hint.className = "equipped-chip-empty";
+    hint.textContent = "Nothing equipped yet - drag an item into a slot.";
+    equippedChips.appendChild(hint);
+  }
+  equippedStrip.appendChild(equippedChips);
+  stage.appendChild(equippedStrip);
   layout.appendChild(stage);
 
   // The form: title, character picker (names grouped by game), notes.
@@ -1417,40 +1464,6 @@ function renderSingleBuildPage(buildId) {
   }
   form.appendChild(statusLine);
 
-  const equippedTitle = document.createElement("h3");
-  equippedTitle.textContent = "Equipped items";
-  form.appendChild(equippedTitle);
-
-  const equippedList = document.createElement("div");
-  for (const equippedNumber of build.equippedItemNumbers) {
-    const item = findItem(equippedNumber);
-    if (item === null) {
-      continue;
-    }
-    const equippedRow = document.createElement("div");
-    equippedRow.className = "build-row";
-    equippedRow.innerHTML = "<div><strong>#" + item.number + " " + escapeHtml(item.name) + "</strong>" +
-      '<div class="item-slot">' + escapeHtml(item.slot) + "</div></div>";
-    const removeButton = document.createElement("button");
-    removeButton.textContent = "Remove";
-    removeButton.addEventListener("click", function () {
-      build.equippedItemNumbers = build.equippedItemNumbers.filter(function (number) {
-        return number !== equippedNumber;
-      });
-      savePlayerData();
-      render();
-    });
-    equippedRow.appendChild(removeButton);
-    equippedList.appendChild(equippedRow);
-  }
-  if (build.equippedItemNumbers.length === 0) {
-    const hint = document.createElement("p");
-    hint.className = "empty-hint";
-    hint.textContent = "Nothing equipped yet. Use the picker below.";
-    equippedList.appendChild(hint);
-  }
-  form.appendChild(equippedList);
-
   // Wishlist: items the player wants for this build, tracked separately from
   // the equipped loadout. Any number of items can be added, including by
   // dragging pictures from the Available items section (issues #41-#43).
@@ -1460,6 +1473,28 @@ function renderSingleBuildPage(buildId) {
 
   const wishlistControls = document.createElement("div");
   wishlistControls.className = "wishlist-controls";
+  // Filter the wishlist by one equipment slot (issue #47) and sort it like
+  // the All Items page (issue #43).
+  const wishlistSlotSelect = document.createElement("select");
+  wishlistSlotSelect.className = "wishlist-filter";
+  const allSlotsOption = document.createElement("option");
+  allSlotsOption.value = "";
+  allSlotsOption.textContent = "All slots";
+  wishlistSlotSelect.appendChild(allSlotsOption);
+  SLOTS.forEach(function (slot) {
+    const option = document.createElement("option");
+    option.value = slot;
+    option.textContent = slot;
+    if (slot === wishlistSlotFilter) {
+      option.selected = true;
+    }
+    wishlistSlotSelect.appendChild(option);
+  });
+  wishlistControls.appendChild(wishlistSlotSelect);
+  wishlistSlotSelect.addEventListener("change", function () {
+    wishlistSlotFilter = wishlistSlotSelect.value;
+    render();
+  });
   const wishlistSortSelect = document.createElement("select");
   wishlistSortSelect.className = "wishlist-sort";
   [["number", "Sort: number"], ["slot", "Sort: slot"], ["name", "Sort: name"]].forEach(function (entry) {
@@ -1504,6 +1539,12 @@ function renderSingleBuildPage(buildId) {
   wishlistList.appendChild(wishlistGrid);
   for (const wishedNumber of sortedWishlistItems(build)) {
     wishlistGrid.appendChild(createWishlistCard(build, wishedNumber));
+  }
+  if (build.wishlistItemNumbers.length > 0 && wishlistGrid.children.length === 0) {
+    const hint = document.createElement("p");
+    hint.className = "empty-hint";
+    hint.textContent = "No wishlist items in the " + wishlistSlotFilter + " slot.";
+    wishlistGrid.appendChild(hint);
   }
   if (build.wishlistItemNumbers.length === 0) {
     const hint = document.createElement("p");
@@ -1641,6 +1682,7 @@ function renderAvailableItems(build, filterText, container) {
       event.dataTransfer.setData("text/plain", String(item.number));
       event.dataTransfer.effectAllowed = "copy";
     });
+    attachTouchDrag(picture, "available", item.number, build);
     picture.addEventListener("dragend", function () {
       dragPayload = null;
     });
@@ -1660,11 +1702,13 @@ function renderAvailableItems(build, filterText, container) {
 // Wishlist sorting (issue #43): the same sort criteria as the All Items page,
 // grouped by equipment slot by default.
 let wishlistSortCriterion = "slot";
+let wishlistSlotFilter = ""; // "" = every slot (issue #47)
 
 function sortedWishlistItems(build) {
   const items = build.wishlistItemNumbers
     .map(findItem)
-    .filter(function (item) { return item !== null; });
+    .filter(function (item) { return item !== null; })
+    .filter(function (item) { return wishlistSlotFilter === "" || item.slot === wishlistSlotFilter; });
   items.sort(function (first, second) {
     if (wishlistSortCriterion === "name") {
       return first.name.localeCompare(second.name);
@@ -1693,6 +1737,7 @@ function createWishlistCard(build, item) {
     event.dataTransfer.setData("text/plain", String(item.number));
     event.dataTransfer.effectAllowed = "copy";
   });
+  attachTouchDrag(card, "wishlist", item.number, build);
   card.addEventListener("click", function () {
     openDetailOverlay(item.number);
   });
@@ -1813,7 +1858,110 @@ document.addEventListener("dragover", function (event) {
 // item's card picture; clicking it opens the item detail. Dragging an item
 // picture from Available items onto a box equips it. Dragging a filled box
 // away from the slots unequips the item (issue #22).
-let dragPayload = null; // { kind: "available"|"equipped", number, buildId }
+let dragPayload = null; // { kind: "available"|"equipped"|"wishlist", number, buildId }
+
+// ---------------------------------------------------------------------------
+// Touch-friendly drag and drop (issues #49, #51). HTML5 drag and drop does
+// not work on touch screens, so the same drag gestures are provided through
+// pointer events: press and hold a picture (equipped slot, available item or
+// wishlist card), then drag it onto a slot box or the wishlist. Dropping an
+// equipped item anywhere else on the screen unequips it, just like the mouse
+// drag (issue #22).
+// ---------------------------------------------------------------------------
+
+const TOUCH_DRAG_HOLD_MS = 200;
+const TOUCH_DRAG_SLOP_PX = 12;
+
+let touchDrag = null;           // { kind, number, buildId, source, startX, startY, downAt, started, ghost, prevHover }
+let touchDragSwallowClick = false; // swallow the single click that follows a drag
+
+function attachTouchDrag(element, kind, number, build) {
+  element.addEventListener("pointerdown", function (event) {
+    if (event.pointerType === "mouse" || touchDrag !== null) {
+      return;
+    }
+    touchDrag = {
+      kind: kind,
+      number: number,
+      buildId: build.id,
+      source: element,
+      startX: event.clientX,
+      startY: event.clientY,
+      downAt: Date.now(),
+      started: false,
+      ghost: null,
+      prevHover: null
+    };
+  });
+}
+
+function startTouchDragGhost() {
+  const ghost = document.createElement("div");
+  ghost.className = "touch-ghost";
+  const image = touchDrag.source.querySelector("img");
+  if (image !== null) {
+    const ghostImage = image.cloneNode(false);
+    ghostImage.draggable = false;
+    ghost.appendChild(ghostImage);
+  } else {
+    ghost.textContent = "#" + touchDrag.number;
+  }
+  document.body.appendChild(ghost);
+  touchDrag.ghost = ghost;
+  dragPayload = { kind: touchDrag.kind, number: touchDrag.number, buildId: touchDrag.buildId };
+}
+
+function touchDropZoneAt(clientX, clientY) {
+  if (typeof document.elementFromPoint !== "function") {
+    return null;
+  }
+  const hit = document.elementFromPoint(clientX, clientY);
+  if (hit === null || hit.closest === undefined) {
+    return null;
+  }
+  return hit.closest(".slot-picture, .wishlist-list");
+}
+
+function setTouchDropHover(hover) {
+  if (touchDrag.prevHover !== null && touchDrag.prevHover !== hover) {
+    touchDrag.prevHover.classList.remove("drop-hover");
+  }
+  if (hover !== null && hover !== touchDrag.prevHover) {
+    hover.classList.add("drop-hover");
+  }
+  touchDrag.prevHover = hover;
+}
+
+function finishTouchDrag(event, cancelled) {
+  if (touchDrag === null) {
+    return;
+  }
+  setTouchDropHover(null);
+  if (touchDrag.ghost !== null) {
+    touchDrag.ghost.remove();
+  }
+  if (touchDrag.started && !cancelled) {
+    const target = touchDropZoneAt(event.clientX, event.clientY);
+    if (target !== null) {
+      // Reuse the HTML5 drop handlers: a synthetic drop event with a
+      // dataTransfer stub runs the same equip/wishlist logic as the mouse.
+      const dropEvent = new Event("drop", { bubbles: false });
+      dropEvent.dataTransfer = { getData: function () { return String(touchDrag.number); } };
+      target.dispatchEvent(dropEvent);
+    } else if (touchDrag.kind === "equipped") {
+      // Dropped anywhere else on the screen: unequip it (issue #49).
+      const build = builds.find(function (candidate) { return candidate.id === touchDrag.buildId; });
+      if (build !== undefined) {
+        unequipFromBuild(build, touchDrag.number);
+      }
+    }
+    // Swallow the single click that follows the pointerup, so the drag does
+    // not also open the item detail overlay.
+    touchDragSwallowClick = true;
+  }
+  touchDrag = null;
+  dragPayload = null;
+}
 
 function unequipFromBuild(build, itemNumber) {
   build.equippedItemNumbers = build.equippedItemNumbers.filter(function (number) {
@@ -1880,8 +2028,10 @@ function createSlotPicture(build, slotName, markerIndex) {
     box.addEventListener("click", function () {
       openDetailOverlay(item.number);
     });
-    // Dragging a filled box away from the slots unequips the item.
+    // Dragging a filled box away from the slots unequips the item. Works
+    // with the mouse (HTML5 dnd) and with a press-hold touch drag (#49, #51).
     box.draggable = true;
+    attachTouchDrag(box, "equipped", item.number, build);
     box.addEventListener("dragstart", function (event) {
       dragPayload = { kind: "equipped", number: item.number, buildId: build.id };
       event.dataTransfer.setData("text/plain", String(item.number));
@@ -2095,7 +2245,7 @@ function openCharacterOverlay(characterIndex) {
   content.innerHTML =
     '<div class="detail-layout">' +
       '<div class="detail-card">' +
-        '<img class="detail-image" id="character-overlay-image" src="assets/characters/' + character.slug + '.webp" alt="' + escapeHtml(character.name) + '" />' +
+        '<img class="detail-image character-mat" id="character-overlay-image" src="assets/characters/' + character.slug + '.webp" alt="' + escapeHtml(character.name) + '" title="Click to enlarge" />' +
         (hasBack
           ? '<button type="button" id="flip-character-button" class="flip-button">Flip card</button>'
           : "") +
@@ -2109,14 +2259,20 @@ function openCharacterOverlay(characterIndex) {
         '<button class="close-overlay">Close</button>' +
       "</div>" +
     "</div>";
+  const matImage = content.querySelector("#character-overlay-image");
+  // Click the mat to toggle between fit-in-view and a large, scrollable
+  // view so every line of the mat can be read (issue #48).
+  matImage.addEventListener("click", function () {
+    matImage.classList.toggle("zoomed");
+    matImage.title = matImage.classList.contains("zoomed") ? "Click to fit in view" : "Click to enlarge";
+  });
   const flipButton = content.querySelector("#flip-character-button");
   if (flipButton !== null) {
     let showingBack = false;
-    const image = content.querySelector("#character-overlay-image");
     flipButton.addEventListener("click", function () {
       showingBack = !showingBack;
-      image.src = "assets/characters/" + character.slug + (showingBack ? "-back" : "") + ".webp";
-      image.alt = escapeHtml(character.name) + (showingBack ? " (card back)" : "");
+      matImage.src = "assets/characters/" + character.slug + (showingBack ? "-back" : "") + ".webp";
+      matImage.alt = escapeHtml(character.name) + (showingBack ? " (card back)" : "");
       flipButton.textContent = showingBack ? "Show front" : "Flip card";
     });
   }
@@ -2254,6 +2410,46 @@ function importCampaignFile(file, statusElement) {
 // ---------------------------------------------------------------------------
 // Wiring and startup
 // ---------------------------------------------------------------------------
+
+// Touch drag and drop: one set of document-level pointer listeners drives
+// every draggable picture on the build page (issues #49, #51).
+document.addEventListener("pointermove", function (event) {
+  if (touchDrag === null) {
+    return;
+  }
+  if (!touchDrag.started) {
+    const moved = Math.hypot(event.clientX - touchDrag.startX, event.clientY - touchDrag.startY);
+    if (moved < TOUCH_DRAG_SLOP_PX) {
+      return;
+    }
+    if (Date.now() - touchDrag.downAt < TOUCH_DRAG_HOLD_MS) {
+      // Moved before the hold time: the user is scrolling, not dragging.
+      touchDrag = null;
+      return;
+    }
+    touchDrag.started = true;
+    startTouchDragGhost();
+  }
+  if (touchDrag.ghost !== null) {
+    touchDrag.ghost.style.left = event.clientX + "px";
+    touchDrag.ghost.style.top = event.clientY + "px";
+  }
+  setTouchDropHover(touchDropZoneAt(event.clientX, event.clientY));
+});
+document.addEventListener("pointerup", function (event) {
+  finishTouchDrag(event, false);
+});
+document.addEventListener("pointercancel", function (event) {
+  finishTouchDrag(event, true);
+});
+document.addEventListener("click", function (event) {
+  if (touchDragSwallowClick) {
+    touchDragSwallowClick = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }
+}, true);
+
 
 document.querySelectorAll("[data-nav]").forEach(function (navButton) {
   navButton.addEventListener("click", function () {

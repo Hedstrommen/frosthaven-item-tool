@@ -582,7 +582,8 @@ li.spoiler-hidden {
 
 .wishlist-list.drop-hover { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 8px; }
 .wishlist-controls { display: flex; align-items: center; gap: 8px; }
-.wishlist-controls .wishlist-sort {
+.wishlist-controls .wishlist-sort,
+.wishlist-controls .wishlist-filter {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -590,6 +591,77 @@ li.spoiler-hidden {
   padding: 6px 8px;
   font-family: inherit;
 }
+
+/* Character mat in the overlay (issue #48): shown large in the highest
+   available resolution; clicking toggles a zoomed, scrollable view. */
+.detail-image.character-mat {
+  cursor: zoom-in;
+  width: min(92vw, 800px);
+  max-width: 100%;
+  height: auto;
+}
+.detail-image.character-mat.zoomed {
+  cursor: zoom-out;
+  width: min(96vw, 1600px);
+}
+
+/* Compact equipped summary under the graphical slots (issue #50) */
+.equipped-strip {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.equipped-strip-heading {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.equipped-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.equipped-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3px 4px 3px 10px;
+  font-size: 0.8rem;
+}
+.equipped-chip button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.equipped-chip-name { color: var(--text); }
+.equipped-chip-name:hover { color: var(--accent); text-decoration: underline; }
+.equipped-chip-remove { color: var(--muted); font-size: 0.9rem; padding: 6px 8px; }
+.equipped-chip-remove:hover { color: var(--accent-warm); }
+.equipped-chip-empty { color: var(--muted); font-size: 0.8rem; }
+
+/* Finger drag ghost (issues #49, #51): the picture that follows the finger */
+.touch-ghost {
+  position: fixed;
+  z-index: 100;
+  width: 64px;
+  transform: translate(-50%, -60%);
+  pointer-events: none;
+  opacity: 0.9;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 3px;
+  color: var(--text);
+  text-align: center;
+  font-size: 0.9rem;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+}
+.touch-ghost img { display: block; width: 100%; border-radius: 5px; pointer-events: none; }
 
 /* Wishlist as item cards (issue #41): same grid of card pictures as the
    All Items page, each one draggable into an equipment slot box. */
@@ -780,6 +852,15 @@ li.spoiler-hidden {
 .import-label { display: block; margin: 12px 0; color: var(--muted); }
 
 @media (max-width: 800px) {
+  /* Issue #51: the graphical slot panel stays visible while scrolling the
+     build page, so items can always be dragged into it on the phone. */
+  .slot-panel {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  }
   .app-shell { flex-direction: column; }
   #sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
   .side-nav { flex-direction: row; flex-wrap: wrap; }

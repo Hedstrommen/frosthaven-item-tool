@@ -11,7 +11,9 @@ A companion tool for the board game **Frosthaven** that lets you:
 7. Switch the whole tool between **Frosthaven** and **Gloomhaven** items with the toggle at the top of the sidebar (campaigns and builds are tracked per game)
 8. Keep a **wishlist** per build, shown as item cards — sort it by equipment slot, drag a card straight into a slot, or equip an item from its card wherever you see it
 9. Download a campaign as its own file and upload a friend's campaign file to import it into your list
-10. Click the character artwork on a build to view it large, and flip the Frosthaven character mats to their back side
+10. Click the character artwork on a build to view the character mat large and flip the Frosthaven mats to their back side; click the mat to zoom in and read every line
+11. Filter the wishlist by slot type, sort it by equipment slot, and drag its cards into the slots — works with a mouse or a press-hold touch drag on the phone
+12. A compact summary of the equipped items sits right under the graphical slot boxes, and the slot panel stays visible while scrolling on mobile
 
 Card text uses inline SVG icons (attack, move, range, heal, shield, conditions, elements) matching the game's iconography.
 
