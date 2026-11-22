@@ -340,6 +340,29 @@ function runChecks(w, dom) {
       if (!/^#[0-9a-f]{6}$/i.test(accent)) throw new Error("no accent color: " + accent);
     });
 
+    // issue 53: the whole build part follows the selected character's colors
+    t("build form is tinted with the character colors", () => {
+      const form = w.document.querySelector(".build-form");
+      if (!form || !form.classList.contains("character-tint")) throw new Error("form not tinted");
+      const layout = w.document.querySelector(".build-layout");
+      const accent = layout.style.getPropertyValue("--char-accent").trim();
+      if (!/^#[0-9a-f]{6}$/i.test(accent)) throw new Error("no accent color on layout: " + accent);
+    });
+
+    // issue 54: filter the available items by slot type
+    t("available items filter by slot type", () => {
+      const select = w.document.querySelector(".available-slot-filter");
+      if (!select) throw new Error("no available slot filter");
+      if (w.document.querySelectorAll(".available-picture").length !== 1) throw new Error("baseline pictures");
+      select.value = "head";
+      select.dispatchEvent(new w.Event("change", { bubbles: true }));
+      if (w.__get("availableSlotFilter") !== "head") throw new Error("filter not applied");
+      if (w.document.querySelectorAll(".available-picture").length !== 0) throw new Error("head filter should hide the legs item");
+      select.value = "";
+      select.dispatchEvent(new w.Event("change", { bubbles: true }));
+      if (w.document.querySelectorAll(".available-picture").length !== 1) throw new Error("clearing filter should show 1");
+    });
+
     // issue 35: page theme follows the active game
     t("body theme class follows active game", () => {
       if (!w.document.body.classList.contains("theme-gloomhaven")) throw new Error("gh theme missing");
