@@ -14,6 +14,7 @@ A companion tool for the board game **Frosthaven** that lets you:
 10. Click the character artwork on a build to view the character mat large and flip the Frosthaven mats to their back side; click the mat to zoom in and read every line
 11. Filter the wishlist by slot type, sort it by equipment slot, and drag its cards into the slots — works with a mouse or a press-hold touch drag on the phone
 12. A compact summary of the equipped items sits right under the graphical slot boxes, and the slot panel stays visible while scrolling on mobile
+13. The whole build page picks up the selected character's colours, and both the wishlist and the available items can be filtered by slot type
 
 Card text uses inline SVG icons (attack, move, range, heal, shield, conditions, elements) matching the game's iconography.
 

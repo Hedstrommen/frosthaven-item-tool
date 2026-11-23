@@ -943,3 +943,47 @@ body.theme-gloomhaven {
 .character-stage.character-themed .slot-picture.filled {
   border-color: color-mix(in srgb, var(--char-accent) 70%, var(--accent-warm));
 }
+
+/* ---------------------------------------------------------------------------
+   Issue #53: the whole build part of the page follows the selected character's
+   colours. The form panel gets a character-tinted surface and accent, so the
+   build stands apart from the sidebar menus and the rest of the page.
+   --------------------------------------------------------------------------- */
+.character-tint {
+  border: 1px solid color-mix(in srgb, var(--char-accent) 40%, var(--border));
+  border-radius: 12px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--char-bg) 22%, transparent) 0%, rgba(11, 20, 28, 0.25) 100%),
+    var(--surface);
+}
+.character-tint h2, .character-tint h3 {
+  color: color-mix(in srgb, var(--char-accent) 65%, var(--text));
+}
+.character-tint input, .character-tint select, .character-tint textarea {
+  border-color: color-mix(in srgb, var(--char-accent) 30%, var(--border));
+}
+.character-tint input:focus, .character-tint select:focus, .character-tint textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--char-accent) 55%, transparent);
+  outline-offset: 0;
+}
+.character-tint .wishlist-card:hover,
+.character-tint .available-picture:hover,
+.character-tint .wishlist-card .card-actions button:hover {
+  border-color: var(--char-accent);
+}
+.character-tint .slot-picker-wrap,
+.character-tint .wishlist-results .build-row {
+  border-color: color-mix(in srgb, var(--char-accent) 25%, var(--border));
+}
+
+/* Available items slot filter on the build page (issue #54) */
+.available-slot-filter {
+  background: var(--surface-bright);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: inherit;
+  max-width: 160px;
+}

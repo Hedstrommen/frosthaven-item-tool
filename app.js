@@ -1290,6 +1290,13 @@ function renderSingleBuildPage(buildId) {
     stage.style.setProperty("--char-bg", character.theme.background);
     stage.style.setProperty("--char-accent", character.theme.accent);
     stage.classList.add("character-themed");
+    // Issue #53: the whole build part of the page picks up the character's
+    // colours, not just the stage - the form panel is tinted with the
+    // character's background and its accents follow the character accent,
+    // keeping this build visually separate from the menus and the rest of
+    // the page.
+    layout.style.setProperty("--char-bg", character.theme.background);
+    layout.style.setProperty("--char-accent", character.theme.accent);
   }
   if (hasArt) {
     const frame = document.createElement("div");
@@ -1387,6 +1394,9 @@ function renderSingleBuildPage(buildId) {
   // The form: title, character picker (names grouped by game), notes.
   const form = document.createElement("div");
   form.className = "build-form";
+  if (character.theme !== undefined) {
+    form.classList.add("character-tint");
+  }
 
   const titleInput = document.createElement("input");
   titleInput.value = build.title;
@@ -1583,10 +1593,33 @@ function renderSingleBuildPage(buildId) {
   availableFilterInput.placeholder = "Filter available items...";
   form.appendChild(availableFilterInput);
 
+  // Slot filter for the available items (issue #54): show only one slot type
+  // while putting a build together.
+  const availableSlotSelect = document.createElement("select");
+  availableSlotSelect.className = "available-slot-filter";
+  const availableAllSlots = document.createElement("option");
+  availableAllSlots.value = "";
+  availableAllSlots.textContent = "All slots";
+  availableSlotSelect.appendChild(availableAllSlots);
+  SLOTS.forEach(function (slot) {
+    const option = document.createElement("option");
+    option.value = slot;
+    option.textContent = slot;
+    if (slot === availableSlotFilter) {
+      option.selected = true;
+    }
+    availableSlotSelect.appendChild(option);
+  });
+  form.appendChild(availableSlotSelect);
+
   const availableGrid = document.createElement("div");
   availableGrid.className = "available-grid";
   form.appendChild(availableGrid);
   renderAvailableItems(build, availableFilterInput.value, availableGrid);
+  availableSlotSelect.addEventListener("change", function () {
+    availableSlotFilter = availableSlotSelect.value;
+    renderAvailableItems(build, availableFilterInput.value, availableGrid);
+  });
   availableFilterInput.addEventListener("input", function () {
     renderAvailableItems(build, availableFilterInput.value, availableGrid);
   });
@@ -1647,6 +1680,8 @@ function showBuildStatus(build, message) {
 // Available items on the build page: small pictures of every item unlocked
 // in the build's campaign. Draggable: drop onto a slot box to equip, or onto
 // the wishlist section to add it there. Clicking opens the item detail.
+let availableSlotFilter = ""; // "" = every slot (issue #54)
+
 function renderAvailableItems(build, filterText, container) {
   container.innerHTML = "";
   const pool = buildPool(build);
@@ -1654,6 +1689,9 @@ function renderAvailableItems(build, filterText, container) {
   const items = catalog
     .filter(function (item) {
       if (!pool.has(item.number)) {
+        return false;
+      }
+      if (availableSlotFilter !== "" && item.slot !== availableSlotFilter) {
         return false;
       }
       if (needle !== "" && !item.name.toLowerCase().includes(needle) && !String(item.number).includes(needle)) {
